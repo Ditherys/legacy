@@ -116,6 +116,8 @@ python .\sync_near_real_time_google.py --active-only
 
 The workflow in `.github/workflows/near-real-time-sync.yml` runs every 5 minutes
 and can also be run manually from the Actions tab.
+It is offset to run at minutes 2, 7, 12, and so on to avoid busier top-of-hour
+GitHub Actions schedule slots.
 It restores the CTM daily cache to avoid refetching old days every run, while
 the current CTM date is refreshed on each near-real-time run.
 
