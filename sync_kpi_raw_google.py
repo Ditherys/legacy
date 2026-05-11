@@ -302,7 +302,7 @@ def generate_kpi_rows(args):
         force_refresh=args.force_refresh,
         refresh_end_date=getattr(args, "refresh_end_date", False),
     )
-    run_timestamp = ctm.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    run_timestamp = ctm.last_updated_timestamp()
     rows = ctm.build_rows(
         ctm_args,
         agents,
@@ -317,6 +317,7 @@ def generate_kpi_rows(args):
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),
         "timezone": {"name": ctm.TIMEZONE_NAME, "label": ctm.TIMEZONE_LABEL},
+        "last_updated_timezone": ctm.LAST_UPDATED_TIMEZONE_NAME,
         "agent_rows": len(rows),
         "raw_inbound_call_rows_fetched": rows_fetched,
         "utilization_endpoint": utilization_url,

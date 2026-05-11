@@ -97,6 +97,7 @@ python .\finalize_kpi_month_google.py --year 2026 --month May --force-refresh
 
 The cron runner writes a live snapshot to `Near_Real_Time`, preserving only row
 1 headers and replacing rows 2+ on each run.
+`Last Updated` is written in Asia/Manila time.
 
 Expected headers:
 

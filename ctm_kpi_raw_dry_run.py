@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 EMAIL_DOMAIN = "@allianceglobalsolutions.com"
 TIMEZONE_NAME = "America/New_York"
 TIMEZONE_LABEL = "EST"
+LAST_UPDATED_TIMEZONE_NAME = "Asia/Manila"
 OUTPUT_DIR = Path("output")
 CACHE_DIR = OUTPUT_DIR / "kpi_cache"
 HEADERS = [
@@ -109,6 +110,10 @@ def hms(seconds):
     hours, remainder = divmod(total_seconds, 3600)
     minutes, secs = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{secs:02d}"
+
+
+def last_updated_timestamp():
+    return datetime.now(ZoneInfo(LAST_UPDATED_TIMEZONE_NAME)).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def safe_rate(numerator, denominator):
@@ -447,7 +452,7 @@ def main():
         end_date,
         force_refresh=args.force_refresh,
     )
-    run_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    run_timestamp = last_updated_timestamp()
     rows = build_rows(args, agents, utilization, call_counts, transfer_counts, run_timestamp)
     output_path = Path(args.output)
     write_csv(output_path, rows)
