@@ -1,8 +1,7 @@
 # GitHub Actions Setup
 
-This repo can run the `Near_Real_Time` sync every 5 minutes using GitHub
-Actions. Keep the repo public if you want standard GitHub-hosted runner minutes
-to be free.
+This repo runs the `Near_Real_Time` sync in GitHub Actions. The timer is handled
+by cron-job.org, which calls the workflow dispatch API every 5 minutes.
 
 The workflow restores CTM daily cache between runs. The current CTM date still
 refreshes every run so the live sheet does not go stale.
@@ -56,7 +55,7 @@ git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 git push -u origin main
 ```
 
-## 4. Run and monitor
+## 4. Run manually first
 
 Go to:
 
@@ -64,4 +63,45 @@ Go to:
 Repo > Actions > Near Real Time CTM Sync
 ```
 
-Click `Run workflow` once to test. After that, the schedule runs every 5 minutes.
+Click `Run workflow` once to test.
+
+## 5. Create the cron-job.org job
+
+Create a fine-grained GitHub token:
+
+```text
+GitHub > Settings > Developer settings > Personal access tokens > Fine-grained tokens
+```
+
+Use:
+
+```text
+Repository access: Ditherys/legacy only
+Repository permissions: Actions = Read and write
+```
+
+In cron-job.org:
+
+```text
+URL: https://api.github.com/repos/Ditherys/legacy/actions/workflows/near-real-time-sync.yml/dispatches
+Method: POST
+Schedule: Every 5 minutes
+```
+
+Headers:
+
+```text
+Accept: application/vnd.github+json
+Authorization: Bearer YOUR_GITHUB_TOKEN
+X-GitHub-Api-Version: 2022-11-28
+Content-Type: application/json
+```
+
+Request body:
+
+```json
+{"ref":"main"}
+```
+
+GitHub returns `204 No Content` on a successful dispatch, so an empty response is
+expected.

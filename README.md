@@ -112,12 +112,11 @@ python .\sync_near_real_time_google.py --active-only --dry-run
 python .\sync_near_real_time_google.py --active-only
 ```
 
-## GitHub Actions schedule
+## GitHub Actions and cron-job.org
 
-The workflow in `.github/workflows/near-real-time-sync.yml` runs every 5 minutes
-and can also be run manually from the Actions tab.
-It is offset to run at minutes 2, 7, 12, and so on to avoid busier top-of-hour
-GitHub Actions schedule slots.
+The workflow in `.github/workflows/near-real-time-sync.yml` is triggered by
+`workflow_dispatch`. Use cron-job.org to call the GitHub workflow dispatch API
+every 5 minutes.
 It restores the CTM daily cache to avoid refetching old days every run, while
 the current CTM date is refreshed on each near-real-time run.
 
@@ -135,4 +134,25 @@ Generate the Google service account JSON secret locally with PowerShell:
 
 ```powershell
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Users\D_Reyes\Desktop\legacy\secrets\root-bricolage-494814-e1-e0e35ae66b7b.json"))
+```
+
+cron-job.org request:
+
+```text
+POST https://api.github.com/repos/Ditherys/legacy/actions/workflows/near-real-time-sync.yml/dispatches
+```
+
+Headers:
+
+```text
+Accept: application/vnd.github+json
+Authorization: Bearer YOUR_GITHUB_TOKEN
+X-GitHub-Api-Version: 2022-11-28
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{"ref":"main"}
 ```
