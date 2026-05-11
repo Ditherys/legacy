@@ -1,0 +1,7 @@
+.env.local
+secrets/
+output/
+__pycache__/
+*.pyc
+*.xlsx
+*.xls

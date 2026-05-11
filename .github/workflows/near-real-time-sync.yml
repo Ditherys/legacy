@@ -1,0 +1,51 @@
+name: Near Real Time CTM Sync
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: near-real-time-ctm-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Build cache key
+        id: cache-key
+        run: echo "key=ctm-kpi-cache-$(date -u +'%Y%m%d%H')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore CTM daily cache
+        uses: actions/cache@v4
+        with:
+          path: output/kpi_cache
+          key: ${{ steps.cache-key.outputs.key }}
+          restore-keys: |
+            ctm-kpi-cache-
+
+      - name: Sync Near_Real_Time
+        env:
+          CTM_API_HOST: https://api.calltrackingmetrics.com
+          CTM_ACCESS_KEY: ${{ secrets.CTM_ACCESS_KEY }}
+          CTM_SECRET_KEY: ${{ secrets.CTM_SECRET_KEY }}
+          CTM_ACCOUNT_ID: ${{ secrets.CTM_ACCOUNT_ID }}
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+          GOOGLE_AGENT_KEY_SHEET: Primary Key
+          GOOGLE_NEAR_REAL_TIME_SHEET: Near_Real_Time
+          GOOGLE_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_B64 }}
+        run: python sync_near_real_time_google.py --active-only
