@@ -560,18 +560,18 @@ def main():
     rows = []
     for agent in agents:
         email = agent["agent_email"]
-        answered = call_counts[email]["answered"]
+        calls = util_inbound[email]["count"]
         transfers_all = transfer_counts[email]["all"]
         talk_seconds = int(round(talk[email]["total"]))
         hold_seconds = int(round(hold[email]["total"]))
-        aht_seconds = round((talk_seconds + hold_seconds) / answered) if answered else 0
+        aht_seconds = round((talk_seconds + hold_seconds) / calls) if calls else 0
 
         rows.append({
             "agent_name": agent["agent_name"],
             "ctm_agent_name": "",
             "agent_email": email,
             "ctm_agent_id": agent["ctm_agent_id"],
-            "inbound_answered_calls": answered,
+            "inbound_answered_calls": calls,
             "transfers": transfers_all,
             "first_time_caller_transfers": transfer_counts[email]["first_time"],
             "repeat_caller_transfers": transfer_counts[email]["repeat"],
