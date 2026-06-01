@@ -299,12 +299,13 @@ def raw_counts(credentials, users, start_date, end_date, force_refresh=False, re
 def build_rows(args, agents, utilization, call_counts, transfer_counts, run_timestamp):
     talk = metric_by_email(utilization, "talk_time")
     hold = metric_by_email(utilization, "hold_time")
+    util_inbound = metric_by_email(utilization, "inbound_calls")
     rows = []
 
     for agent in agents:
         email = agent["email"]
-        calls = call_counts[email]["answered"]
-        transfers = transfer_counts[email]["first_time"]
+        calls = util_inbound[email]["count"]
+        transfers = transfer_counts[email]["all"]
         talk_seconds = int(round(talk[email]["total"]))
         hold_seconds = int(round(hold[email]["total"]))
 
