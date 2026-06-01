@@ -104,25 +104,60 @@ def validate_headers(service, spreadsheet_id, sheet_name):
         )
 
 
+def _row_key(year, month, agent):
+    return (str(year).strip().lower(), str(month).strip().lower(), str(agent).strip().lower())
+
+
 def write_values(service, spreadsheet_id, sheet_name, values, dry_run=False):
+    """
+    Upserts rows by (Year, Month, Agent) key.
+    Rows from other months are preserved — only the incoming month's rows are touched.
+    New rows are appended; existing matching rows are updated in-place.
+    """
     if dry_run:
-        return
+        return {"updated": 0, "appended": 0}
 
-    service.spreadsheets().values().clear(
-        spreadsheetId=spreadsheet_id,
-        range=kpi_sync.sheet_range(sheet_name, "A2:I"),
-        body={},
-    ).execute()
+    existing = kpi_sync.get_sheet_values(service, spreadsheet_id, sheet_name, "A2:I")
 
-    if not values:
-        return
+    # Map (year, month, agent) → 1-based sheet row number (row 2 is the first data row)
+    row_map = {}
+    for idx, row in enumerate(existing):
+        padded = kpi_sync.pad(row, 3)
+        if not any(str(c).strip() for c in padded[:3]):
+            continue
+        key = _row_key(padded[0], padded[1], padded[2])
+        if key not in row_map:
+            row_map[key] = idx + 2
 
-    service.spreadsheets().values().update(
-        spreadsheetId=spreadsheet_id,
-        range=kpi_sync.sheet_range(sheet_name, "A2:I"),
-        valueInputOption="USER_ENTERED",
-        body={"values": values},
-    ).execute()
+    updates = []
+    appends = []
+    for value in values:
+        key = _row_key(value[0], value[1], value[2])
+        row_number = row_map.get(key)
+        if row_number:
+            updates.append({
+                "range": kpi_sync.sheet_range(sheet_name, f"A{row_number}:I{row_number}"),
+                "values": [value],
+            })
+        else:
+            appends.append(value)
+
+    if updates:
+        service.spreadsheets().values().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"valueInputOption": "USER_ENTERED", "data": updates},
+        ).execute()
+
+    if appends:
+        service.spreadsheets().values().append(
+            spreadsheetId=spreadsheet_id,
+            range=kpi_sync.sheet_range(sheet_name, "A2:I"),
+            valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
+            body={"values": appends},
+        ).execute()
+
+    return {"updated": len(updates), "appended": len(appends)}
 
 
 def main(argv=None):
@@ -146,7 +181,7 @@ def main(argv=None):
         values = near_real_time_values(rows)
 
         validate_headers(service, args.spreadsheet_id, args.sheet)
-        write_values(service, args.spreadsheet_id, args.sheet, values, dry_run=args.dry_run)
+        write_result = write_values(service, args.spreadsheet_id, args.sheet, values, dry_run=args.dry_run)
     except HttpError as exc:
         detail = exc.content.decode("utf-8", errors="replace") if exc.content else str(exc)
         raise SystemExit(f"Google Sheets API error:\n{detail}") from exc
@@ -161,6 +196,8 @@ def main(argv=None):
             "mapped_agent_rows": mapped_agent_rows,
             "credentials_source": credentials_source["label"],
             "written_rows": len(values),
+            "updated_rows": (write_result or {}).get("updated", 0),
+            "appended_rows": (write_result or {}).get("appended", 0),
             "dry_run": args.dry_run,
         }
     )
@@ -172,7 +209,7 @@ def main(argv=None):
     action = "Dry run" if args.dry_run else "Synced"
     print(f"{action} {calendar.month_name[args.month]} {args.year} to '{args.sheet}'")
     print(f"Date range: {summary['start_date']} to {summary['end_date']}")
-    print(f"Rows written: {len(values)}")
+    print(f"Rows written: {len(values)} (updated: {summary['updated_rows']}, appended: {summary['appended_rows']})")
     print(f"Agent key mappings: {mapped_agent_rows} from '{args.agent_key_sheet}'")
     if args.show_rows:
         for value in values:

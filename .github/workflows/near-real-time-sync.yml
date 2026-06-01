@@ -2,6 +2,15 @@ name: Near Real Time CTM Sync
 
 on:
   workflow_dispatch:
+    inputs:
+      month:
+        description: 'Month to sync (1-12). Leave empty for current month.'
+        required: false
+        default: ''
+      year:
+        description: 'Year to sync (e.g. 2026). Leave empty for current year.'
+        required: false
+        default: ''
 
 concurrency:
   group: near-real-time-ctm-sync
@@ -46,4 +55,12 @@ jobs:
           GOOGLE_AGENT_KEY_SHEET: Primary Key
           GOOGLE_NEAR_REAL_TIME_SHEET: Near_Real_Time
           GOOGLE_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_B64 }}
-        run: python sync_near_real_time_google.py --active-only
+        run: |
+          ARGS="--active-only"
+          if [ -n "${{ github.event.inputs.month }}" ]; then
+            ARGS="$ARGS --month ${{ github.event.inputs.month }}"
+          fi
+          if [ -n "${{ github.event.inputs.year }}" ]; then
+            ARGS="$ARGS --year ${{ github.event.inputs.year }}"
+          fi
+          python sync_near_real_time_google.py $ARGS
