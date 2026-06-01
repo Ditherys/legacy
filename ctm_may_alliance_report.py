@@ -32,10 +32,30 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 DEFAULT_SPREADSHEET_ID = "1vMJwoOoFC9jg0mOAOwT2i1iWSVNh16PsQ89U2Icr2AU"
 DEFAULT_AGENT_KEY_SHEET = "Primary Key"
 
-# --- Melanie Aban verification ---
-VERIFY_NAME = "Melanie Aban"
-VERIFY_CALLS = 164
-VERIFY_TRANSFERS = 28
+# --- Manual May 2026 data for verification (calls, transfers) ---
+# Names are in "Last, First" format as provided manually.
+# The script will try to match against both mapped KPI names and original CTM names.
+VERIFY_AGENTS = [
+    ("Aban, Ma Melanie",         164, 28),
+    ("Angel, Byron Jake",         202, 36),
+    ("Bernardo, Sean",            183, 31),
+    ("Buranis, Shenelyn",          93, 16),
+    ("Dujale, John Vincent",       73, 12),
+    ("Galong, Julia Mae",          90, 16),
+    ("Lajo, Ella Mae",            109, 20),
+    ("Lopez, Maria Nelia",        217, 23),
+    ("Lumactod, Nikki",           170, 33),
+    ("Magbanua, Rubie",           138, 28),
+    ("Navarro, Joanne Stephanie", 124, 25),
+    ("Padullano, Larinz",         254, 46),
+    ("Perez, Karen",              205, 27),
+    ("Rapis, Samuel",             234, 40),
+    ("Regla, Ma Cecilia",         255, 36),
+    ("Sagun, Rae",                140, 26),
+    ("Villarta, Remington",        89, 11),
+]
+
+# Talk/hold/AHT for Melanie Aban only (used for endpoint verification)
 VERIFY_TALK_HMS = "6:45:05"
 VERIFY_HOLD_HMS = "0:46:19"
 VERIFY_AHT_HMS = "0:02:45"
@@ -430,65 +450,86 @@ def raw_counts_from_calls(credentials, users):
 # Verification
 # ---------------------------------------------------------------------------
 
+def _name_tokens(name):
+    """Normalize a name to a frozenset of lowercase tokens for flexible matching.
+    Handles both 'First Last' and 'Last, First' formats."""
+    return frozenset(re.sub(r"[^a-z ]", "", name.lower()).split())
+
+
+def _find_row(rows, verify_name):
+    """Find a report row by name, tolerating 'Last, First' vs 'First Last' differences."""
+    tokens = _name_tokens(verify_name)
+    for row in rows:
+        if _name_tokens(row["agent_name"]) == tokens:
+            return row
+        if _name_tokens(row.get("ctm_agent_name", "")) == tokens:
+            return row
+    return None
+
+
 def print_verification(rows, call_counts, transfer_counts, talk_by_email, hold_by_email, util_inbound_by_email):
     print()
-    print("=" * 65)
-    print(f"ENDPOINT VERIFICATION: {VERIFY_NAME}")
-    print(f"  Expected: {VERIFY_CALLS} calls | {VERIFY_TRANSFERS} transfers")
-    print(f"            talk {VERIFY_TALK_HMS} | hold {VERIFY_HOLD_HMS} | aht {VERIFY_AHT_HMS}")
-    print("=" * 65)
+    print("=" * 72)
+    print("MAY 2026 VERIFICATION — manual data vs script output")
+    print(f"  {'Agent':<30} {'Exp':>5} {'Got':>5} {'Calls':>7}  {'Exp':>5} {'Got':>5} {'Xfrs':>7}")
+    print(f"  {'-'*30} {'-'*5} {'-'*5} {'-'*7}  {'-'*5} {'-'*5} {'-'*7}")
 
-    # Search by mapped name first, then by original CTM name stored in ctm_agent_name.
-    agent_row = next(
-        (r for r in rows if r["agent_name"] == VERIFY_NAME or r.get("ctm_agent_name") == VERIFY_NAME),
-        None,
-    )
-    if not agent_row:
-        print(f"  WARNING: '{VERIFY_NAME}' not found in report rows.")
-        print("  Tip: check if the name differs in CTM or in your Primary Key mapping.")
-        return
+    all_match = True
+    not_found = []
 
-    email = agent_row["agent_email"]
-    display = agent_row["agent_name"]
-    ctm_name = agent_row.get("ctm_agent_name", display)
-    print(f"  Email   : {email}")
-    if ctm_name != display:
-        print(f"  CTM name: {ctm_name}  →  mapped to: {display}")
-    print()
+    for verify_name, exp_calls, exp_transfers in VERIFY_AGENTS:
+        agent_row = _find_row(rows, verify_name)
+        if not agent_row:
+            not_found.append(verify_name)
+            all_match = False
+            continue
 
-    raw_calls = call_counts[email]["answered"]
-    util_inbound = util_inbound_by_email[email]["count"]
-    transfers_all = transfer_counts[email]["all"]
-    transfers_first = transfer_counts[email]["first_time"]
-    transfers_repeat = transfer_counts[email]["repeat"]
-    talk_s = int(round(talk_by_email[email]["total"]))
-    hold_s = int(round(hold_by_email[email]["total"]))
+        email = agent_row["agent_email"]
+        got_calls = call_counts[email]["answered"]
+        got_transfers = transfer_counts[email]["all"]
+        calls_tag = "✓" if got_calls == exp_calls else "✗"
+        xfrs_tag = "✓" if got_transfers == exp_transfers else "✗"
+        if calls_tag == "✗" or xfrs_tag == "✗":
+            all_match = False
 
-    exp_talk_s = hms_to_seconds(VERIFY_TALK_HMS)
-    exp_hold_s = hms_to_seconds(VERIFY_HOLD_HMS)
-    exp_aht_s = hms_to_seconds(VERIFY_AHT_HMS)
+        display = agent_row["agent_name"]
+        print(f"  {display:<30} {exp_calls:>5} {got_calls:>5} {calls_tag:>7}  {exp_transfers:>5} {got_transfers:>5} {xfrs_tag:>7}")
 
-    def tag(actual, expected):
-        return "MATCH ✓" if actual == expected else f"DIFF  (expected {expected})"
+    print("=" * 72)
 
-    print("  CALLS")
-    print(f"    /calls.json  direction=inbound status=answered : {raw_calls:>4}  {tag(raw_calls, VERIFY_CALLS)}")
-    print(f"    /utilization inbound_calls metric              : {util_inbound:>4}  {tag(util_inbound, VERIFY_CALLS)}")
-    print()
-    print("  TRANSFERS  (calls[].transfers[].from = agent SID, per answered inbound call)")
-    print(f"    all transfers (first-time + repeat)            : {transfers_all:>4}  {tag(transfers_all, VERIFY_TRANSFERS)}")
-    print(f"    first-time caller transfers only               : {transfers_first:>4}  {tag(transfers_first, VERIFY_TRANSFERS)}")
-    print(f"    repeat caller transfers only                   : {transfers_repeat:>4}")
-    print()
-    print("  TALK / HOLD TIME  (source: /utilization talk_time.total, hold_time.total)")
-    print(f"    talk time  : {hms(talk_s):>10}  {tag(talk_s, exp_talk_s)}")
-    print(f"    hold time  : {hms(hold_s):>10}  {tag(hold_s, exp_hold_s)}")
-    print()
-    print("  AHT  = (talk + hold) / calls")
-    for call_label, call_n in [("raw calls.json", raw_calls), ("util inbound_calls", util_inbound)]:
-        aht_s = round((talk_s + hold_s) / call_n) if call_n else 0
-        print(f"    using {call_label} ({call_n:>3}):  {hms(aht_s):>10}  {tag(aht_s, exp_aht_s)}")
-    print("=" * 65)
+    if not_found:
+        print("  NOT FOUND (check Primary Key name mapping):")
+        for name in not_found:
+            print(f"    - {name}")
+
+    if all_match and not not_found:
+        print("  All agents MATCH ✓")
+    else:
+        print("  Some agents have mismatches — check ✗ rows above.")
+
+    # Detailed endpoint breakdown for Melanie Aban only (talk/hold/AHT)
+    melanie_row = _find_row(rows, "Aban, Ma Melanie")
+    if melanie_row:
+        email = melanie_row["agent_email"]
+        raw_calls = call_counts[email]["answered"]
+        util_inbound = util_inbound_by_email[email]["count"]
+        talk_s = int(round(talk_by_email[email]["total"]))
+        hold_s = int(round(hold_by_email[email]["total"]))
+        exp_talk_s = hms_to_seconds(VERIFY_TALK_HMS)
+        exp_hold_s = hms_to_seconds(VERIFY_HOLD_HMS)
+        exp_aht_s = hms_to_seconds(VERIFY_AHT_HMS)
+
+        def tag(actual, expected):
+            return "MATCH ✓" if actual == expected else f"DIFF  (expected {expected})"
+
+        print()
+        print("  ENDPOINT DETAIL: Melanie Aban — talk/hold/AHT source check")
+        print(f"    talk : {hms(talk_s):>10}  {tag(talk_s, exp_talk_s)}")
+        print(f"    hold : {hms(hold_s):>10}  {tag(hold_s, exp_hold_s)}")
+        for label, n in [("raw calls.json", raw_calls), ("util inbound_calls", util_inbound)]:
+            aht_s = round((talk_s + hold_s) / n) if n else 0
+            print(f"    aht ({label} / {n}): {hms(aht_s):>10}  {tag(aht_s, exp_aht_s)}")
+    print("=" * 72)
 
 
 # ---------------------------------------------------------------------------
