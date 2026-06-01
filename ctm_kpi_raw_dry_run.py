@@ -271,11 +271,10 @@ def raw_counts(credentials, users, start_date, end_date, force_refresh=False, re
         for call in calls:
             assigned_email = ((call.get("agent") or {}).get("email") or "").strip().lower()
             is_answered = (call.get("status") or "").strip().lower() == "answered"
-            was_transferred = bool(call.get("transfers"))
             if assigned_email.endswith(EMAIL_DOMAIN):
-                if is_answered and not was_transferred:
+                if is_answered:
                     counts[assigned_email]["answered"] += 1
-                elif not is_answered:
+                else:
                     counts[assigned_email]["not_answered"] += 1
 
             if not is_answered:

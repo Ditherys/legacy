@@ -36,7 +36,7 @@ DEFAULT_AGENT_KEY_SHEET = "Primary Key"
 # Names are in "Last, First" format as provided manually.
 # The script will try to match against both mapped KPI names and original CTM names.
 VERIFY_AGENTS = [
-    ("Aban, Ma Melanie",         164, 28),
+    ("Aban, Ma Melanie",         169, 28),
     ("Angel, Byron Jake",         202, 36),
     ("Bernardo, Sean",            183, 31),
     ("Buranis, Shenelyn",          93, 16),
@@ -427,8 +427,7 @@ def raw_counts_from_calls(credentials, users):
         total_rows += len(calls)
         for call in calls:
             assigned_email = ((call.get("agent") or {}).get("email") or "").strip().lower()
-            was_transferred = bool(call.get("transfers"))
-            if assigned_email.endswith(EMAIL_DOMAIN) and not was_transferred:
+            if assigned_email.endswith(EMAIL_DOMAIN):
                 call_counts[assigned_email]["answered"] += 1
 
             from_emails = set()
@@ -561,7 +560,7 @@ def main():
     rows = []
     for agent in agents:
         email = agent["agent_email"]
-        calls = util_inbound[email]["count"]
+        calls = call_counts[email]["answered"]
         transfers_all = transfer_counts[email]["all"]
         talk_seconds = int(round(talk[email]["total"]))
         hold_seconds = int(round(hold[email]["total"]))
