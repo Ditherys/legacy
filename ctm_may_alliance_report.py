@@ -427,7 +427,8 @@ def raw_counts_from_calls(credentials, users):
         total_rows += len(calls)
         for call in calls:
             assigned_email = ((call.get("agent") or {}).get("email") or "").strip().lower()
-            if assigned_email.endswith(EMAIL_DOMAIN):
+            was_transferred = bool(call.get("transfers"))
+            if assigned_email.endswith(EMAIL_DOMAIN) and not was_transferred:
                 call_counts[assigned_email]["answered"] += 1
 
             from_emails = set()

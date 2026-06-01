@@ -271,10 +271,11 @@ def raw_counts(credentials, users, start_date, end_date, force_refresh=False, re
         for call in calls:
             assigned_email = ((call.get("agent") or {}).get("email") or "").strip().lower()
             is_answered = (call.get("status") or "").strip().lower() == "answered"
+            was_transferred = bool(call.get("transfers"))
             if assigned_email.endswith(EMAIL_DOMAIN):
-                if is_answered:
+                if is_answered and not was_transferred:
                     counts[assigned_email]["answered"] += 1
-                else:
+                elif not is_answered:
                     counts[assigned_email]["not_answered"] += 1
 
             if not is_answered:
@@ -304,7 +305,7 @@ def build_rows(args, agents, utilization, call_counts, transfer_counts, run_time
 
     for agent in agents:
         email = agent["email"]
-        calls = util_inbound[email]["count"]
+        calls = call_counts[email]["answered"]
         transfers = transfer_counts[email]["all"]
         talk_seconds = int(round(talk[email]["total"]))
         hold_seconds = int(round(hold[email]["total"]))
