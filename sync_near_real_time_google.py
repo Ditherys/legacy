@@ -21,6 +21,7 @@ HEADERS = [
     "Hold Time",
     "AHT",
     "Last Updated",
+    "Outbound Calls",
 ]
 
 
@@ -53,6 +54,7 @@ def near_real_time_values(rows):
                 hold_time,
                 aht,
                 row["Last Updated"],
+                row.get("Outbound Calls") or 0,
             ]
         )
     return values
@@ -91,14 +93,14 @@ def parse_args(argv=None):
 
 
 def validate_headers(service, spreadsheet_id, sheet_name):
-    values = kpi_sync.get_sheet_values(service, spreadsheet_id, sheet_name, "A1:I1")
+    values = kpi_sync.get_sheet_values(service, spreadsheet_id, sheet_name, "A1:J1")
     if not values:
-        raise SystemExit(f"Sheet tab '{sheet_name}' is missing headers in A1:I1.")
+        raise SystemExit(f"Sheet tab '{sheet_name}' is missing headers in A1:J1.")
 
     actual = kpi_sync.pad(values[0], len(HEADERS))[: len(HEADERS)]
     if actual != HEADERS:
         raise SystemExit(
-            f"'{sheet_name}' headers do not match expected A:I layout.\n"
+            f"'{sheet_name}' headers do not match expected A:J layout.\n"
             f"Expected: {HEADERS}\n"
             f"Actual:   {actual}"
         )
@@ -117,7 +119,7 @@ def write_values(service, spreadsheet_id, sheet_name, values, dry_run=False):
     if dry_run:
         return {"updated": 0, "appended": 0}
 
-    existing = kpi_sync.get_sheet_values(service, spreadsheet_id, sheet_name, "A2:I")
+    existing = kpi_sync.get_sheet_values(service, spreadsheet_id, sheet_name, "A2:J")
 
     # Map (year, month, agent) → 1-based sheet row number (row 2 is the first data row)
     row_map = {}
@@ -136,7 +138,7 @@ def write_values(service, spreadsheet_id, sheet_name, values, dry_run=False):
         row_number = row_map.get(key)
         if row_number:
             updates.append({
-                "range": kpi_sync.sheet_range(sheet_name, f"A{row_number}:I{row_number}"),
+                "range": kpi_sync.sheet_range(sheet_name, f"A{row_number}:J{row_number}"),
                 "values": [value],
             })
         else:
@@ -151,7 +153,7 @@ def write_values(service, spreadsheet_id, sheet_name, values, dry_run=False):
     if appends:
         service.spreadsheets().values().append(
             spreadsheetId=spreadsheet_id,
-            range=kpi_sync.sheet_range(sheet_name, "A2:I"),
+            range=kpi_sync.sheet_range(sheet_name, "A2:J"),
             valueInputOption="USER_ENTERED",
             insertDataOption="INSERT_ROWS",
             body={"values": appends},

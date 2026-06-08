@@ -300,6 +300,7 @@ def build_rows(args, agents, utilization, call_counts, transfer_counts, run_time
     talk = metric_by_email(utilization, "talk_time")
     hold = metric_by_email(utilization, "hold_time")
     util_inbound = metric_by_email(utilization, "inbound_calls")
+    outbound = metric_by_email(utilization, "outbound_calls")
     rows = []
 
     for agent in agents:
@@ -308,6 +309,7 @@ def build_rows(args, agents, utilization, call_counts, transfer_counts, run_time
         transfers = transfer_counts[email]["all"]
         talk_seconds = int(round(talk[email]["total"]))
         hold_seconds = int(round(hold[email]["total"]))
+        outbound_calls = outbound[email]["count"]
 
         if args.active_only and not any([calls, transfers, talk_seconds, hold_seconds]):
             continue
@@ -338,6 +340,7 @@ def build_rows(args, agents, utilization, call_counts, transfer_counts, run_time
                 "Calls__aht_denominator": calls,
                 "AHT": "",
                 "Last Updated": run_timestamp,
+                "Outbound Calls": outbound_calls,
             }
         )
 
