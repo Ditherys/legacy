@@ -53,15 +53,17 @@ SHEET_HEADERS = [
     "Time",
     "Agent",
     "custom[activity_notes]",
+    "",          # G — reserved for user
+    "Last Synced",
 ]
 
 # Upsert key: (Customer #, Date, Time) — column indices 0, 2, 3
 UPSERT_KEY_COLS = (0, 2, 3)
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-NUM_COLS = len(SHEET_HEADERS)  # 6 → column F
-COL_LETTER = "F"
-RANGE_FULL = f"A:F"
+NUM_COLS = len(SHEET_HEADERS)  # 8 → column H
+COL_LETTER = "H"
+RANGE_FULL = "A:H"
 
 
 # ---------------------------------------------------------------------------
@@ -248,7 +250,7 @@ def get_values(service, spreadsheet_id, sheet_name, a1):
 
 
 def ensure_headers(service, spreadsheet_id, sheet_name):
-    existing = get_values(service, spreadsheet_id, sheet_name, "A1:F1")
+    existing = get_values(service, spreadsheet_id, sheet_name, "A1:H1")
     if existing and existing[0] == SHEET_HEADERS:
         return
     service.spreadsheets().values().update(
@@ -270,8 +272,10 @@ def _row_key(row):
     )
 
 
-def upsert_rows(service, spreadsheet_id, sheet_name, new_rows):
-    """Update rows with matching composite key in-place; append new ones."""
+def upsert_rows(service, spreadsheet_id, sheet_name, new_rows, sync_timestamp):
+    """Update rows with matching composite key in-place; append new ones.
+    Last Synced (col H) is only stamped on new rows, never overwritten.
+    """
     existing = get_values(service, spreadsheet_id, sheet_name, f"A2:{COL_LETTER}")
 
     key_to_row = {}
@@ -286,12 +290,14 @@ def upsert_rows(service, spreadsheet_id, sheet_name, new_rows):
         key = _row_key(row)
         if key in key_to_row:
             row_num = key_to_row[key]
+            # Update columns A:F only — leave G and Last Synced (H) untouched
             updates.append({
-                "range": sheet_range(sheet_name, f"A{row_num}:{COL_LETTER}{row_num}"),
-                "values": [row],
+                "range": sheet_range(sheet_name, f"A{row_num}:F{row_num}"),
+                "values": [row[:6]],
             })
         else:
-            appends.append(row)
+            # New row: stamp Last Synced in col H
+            appends.append(row[:6] + ["", sync_timestamp])
 
     if updates:
         service.spreadsheets().values().batchUpdate(
@@ -351,11 +357,13 @@ def main():
 
     print(f"Total rows to sync: {len(all_rows)}")
 
+    sync_timestamp = datetime.now(ZoneInfo(TIMEZONE_NAME)).strftime("%Y-%m-%d %I:%M:%S %p")
+
     google_creds = find_google_credentials()
     service = build_sheets_service(google_creds)
 
     ensure_headers(service, spreadsheet_id, sheet_name)
-    updated, appended = upsert_rows(service, spreadsheet_id, sheet_name, all_rows)
+    updated, appended = upsert_rows(service, spreadsheet_id, sheet_name, all_rows, sync_timestamp)
     print(f"Done — updated: {updated}, appended: {appended}")
 
 
