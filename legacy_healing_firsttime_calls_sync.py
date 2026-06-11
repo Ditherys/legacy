@@ -306,9 +306,10 @@ def upsert_rows(service, spreadsheet_id, sheet_name, new_rows, sync_timestamp):
         ).execute()
 
     if appends:
+        # Anchor to column A so Sheets finds the last row by column A, not H
         service.spreadsheets().values().append(
             spreadsheetId=spreadsheet_id,
-            range=sheet_range(sheet_name, f"A2:{COL_LETTER}"),
+            range=sheet_range(sheet_name, "A2"),
             valueInputOption="RAW",
             insertDataOption="INSERT_ROWS",
             body={"values": appends},
@@ -330,7 +331,12 @@ def main():
 
     creds = ctm_credentials()
     today = datetime.now(ZoneInfo(TIMEZONE_NAME)).date()
-    start_date = date(today.year, today.month, 1)  # month-to-date
+    start_date_env = os.getenv("SYNC_START_DATE")
+    if start_date_env:
+        from datetime import date as dt_date
+        start_date = dt_date.fromisoformat(start_date_env)
+    else:
+        start_date = date(today.year, today.month, 1)  # month-to-date
 
     print(f"Fetching Legacy Healing first-time inbound calls {start_date} to {today} (EST)")
 
