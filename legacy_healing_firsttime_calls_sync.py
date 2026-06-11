@@ -338,7 +338,7 @@ def main():
     current = start_date
     while current <= today:
         calls = fetch_day_calls(creds, current, force_refresh=force_refresh)
-        phil_calls = [c for c in calls if is_philippine_rep(c)]
+        phil_calls = [c for c in calls if is_philippine_rep(c) and c.get("is_new_caller")]
         for call in phil_calls:
             all_rows.append(format_call_row(call))
         print(f"  {current.isoformat()}: {len(calls)} first-time inbound, {len(phil_calls)} Philippine rep calls")
