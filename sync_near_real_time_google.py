@@ -37,11 +37,13 @@ def near_real_time_values(rows):
     values = []
     for row in rows:
         calls = int(row.get("Calls") or 0)
+        outbound_calls = int(row.get("Outbound Calls") or 0)
         talk_time = row.get("Talk Time") or "0:00:00"
         hold_time = row.get("Hold Time") or "0:00:00"
         aht = ""
-        if calls:
-            aht = ctm.hms(round((parse_duration(talk_time) + parse_duration(hold_time)) / calls))
+        total_calls = calls + outbound_calls
+        if total_calls:
+            aht = ctm.hms(round((parse_duration(talk_time) + parse_duration(hold_time)) / total_calls))
 
         values.append(
             [
